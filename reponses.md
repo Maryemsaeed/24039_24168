@@ -1,5 +1,7 @@
 ﻿# TP1 – SOAP et WSDL
 
+Matricules : 24039 et 24168
+
 ## Étape 1
 
 1. L'annotation `@WebService` sur la classe `EmpruntService` en fait un service web.
@@ -31,90 +33,47 @@
 4. Non, idAdherent et isbn ne portent pas de préfixe d'espace de noms. Le schéma ne
    déclare pas elementFormDefault="qualified" : les éléments locaux (les paramètres) ne
    sont donc pas qualifiés, contrairement à l'élément de l'opération (bib:emprunterLivre).
-   Les messages envoyés avec curl sur ce modèle ont été acceptés par le service.
 
-5. Dans l'onglet Raw, HTTP correspond à la ligne POST et aux en-têtes (Content-Type,
-   SOAPAction) : il transporte le message jusqu'au serveur. XML est le format du
-   document envoyé. SOAP est la structure de l'enveloppe (Envelope, Header, Body) qui
-   donne un sens à ce XML. Le WSDL est le contrat : il décrit les opérations, les
-   messages, le format (binding) et l'adresse du service, et permet à SoapUI de
-   construire la requête sans lire le code Java.
-\# TP1 – SOAP et WSDL
+5. Dans l'onglet Raw, HTTP correspond à la ligne POST, aux en-têtes et au code de réponse
+   200 : il transporte le message jusqu'au serveur. XML est le format du texte échangé.
+   SOAP est la structure de l'enveloppe (Envelope, Header, Body) et des Faults. Le WSDL
+   est le contrat : il décrit les opérations, les messages, le binding, l'adresse du
+   service et les types.
 
+## Étape 3
 
+1. POST est utilisé parce que SOAP transporte une enveloppe XML dans le corps de la
+   requête HTTP. Un GET n'a pas de corps : il ne peut pas porter l'enveloppe, même
+   pour une simple lecture. Le nom de l'opération et ses paramètres sont dans le Body.
 
-Matricules : 24039 et 24168
+2. Non, le bloc jeton n'a pas empêché le traitement : le service a répondu 200 avec
+   un numéro d'emprunt. Le bloc n'a pas l'attribut mustUnderstand="1", donc le serveur
+   n'est pas obligé de le comprendre : il est ignoré. Aucune opération du service ne
+   déclare ce jeton dans le WSDL.
 
+3. Le service ne traite pas le message SOAP 1.2 : curl reçoit « Empty reply from server »,
+   sans numéro d'emprunt. Le binding du WSDL est déclaré en SOAP 1.1
+   (http://schemas.xmlsoap.org/wsdl/soap/), le service attend donc l'enveloppe
+   http://schemas.xmlsoap.org/soap/envelope/. L'enveloppe SOAP 1.2
+   (http://www.w3.org/2003/05/soap-envelope) appartient à une autre version du protocole
+   et n'est pas reconnue par ce service. Le contrat WSDL fixe donc la version SOAP que
+   le client doit utiliser.
 
+4. Les cinq erreurs et leur correction :
+   1. `<soap:envelope>` en minuscules : XML est sensible à la casse, la balise ouvrante ne
+      correspond pas à `</soap:Envelope>`. Correction : `<soap:Envelope>`.
+   2. `</rendreLivre>` sans préfixe : ne correspond pas à `<bib:rendreLivre>`.
+      Correction : `</bib:rendreLivre>`.
+   3. Mauvais espace de noms `http://supnum.mr/bibliotheque`. Correction :
+      `http://supnum.mr/bib`.
+   4. Paramètre `<bib:numero>` : le nom attendu est `numeroEmprunt`, sans préfixe (comme
+      `idAdherent` et `isbn`). Correction : `<numeroEmprunt>`.
+   5. Le Header est placé après le Body. Correction : Header avant Body.
 
-Travail rendu partiellement : étapes 1 et 2 de la partie A terminées.
-
-Les étapes 3 à 6 et la conclusion ne sont pas faites.
-
-
-
-\## Étape 1
-
-
-
-1\. L'annotation `@WebService` sur la classe `EmpruntService` en fait un service web.
-
-&#x20;  L'annotation `@WebFault` sur `LivreIndisponibleException` en fait une erreur déclarée
-
-&#x20;  dans le contrat (elle apparaît dans le WSDL comme `fault`).
-
-
-
-2\. JAXB crée les objets par réflexion : il instancie d'abord la classe avec un constructeur
-
-&#x20;  sans argument, puis remplit les champs à partir du XML reçu. Sans constructeur vide,
-
-&#x20;  il ne peut pas construire l'objet.
-
-
-
-\## Étape 2
-
-
-
-1\. URL du service : http://localhost:8080/bib/EmpruntService (soap:address dans
-
-&#x20;  le service EmpruntService, port EmpruntPort). Deux opérations :
-
-&#x20;  - emprunterLivre : entrée = message emprunterLivre, sortie = message
-
-&#x20;    emprunterLivreResponse, fault = message LivreIndisponibleException
-
-&#x20;  - rendreLivre : entrée = message rendreLivre, sortie = message rendreLivreResponse
-
-
-
-2\. Le binding EmpruntPortBinding déclare style="document" et use="literal".
-
-&#x20;  C'est du SOAP 1.1 : l'espace de noms de soap:binding est
-
-&#x20;  http://schemas.xmlsoap.org/wsdl/soap/.
-
-
-
-3\. Dans le schéma XSD (?xsd=1), isbn et dateRetour ont le type xs:string. La règle de
-
-&#x20;  format de l'ISBN n'apparaît pas : elle n'existe que dans le code Java (Pattern).
-
-
-
-4\. Non, idAdherent et isbn n'ont pas de préfixe d'espace de noms (le schéma n'a pas
-
-&#x20;  elementFormDefault="qualified"). Seul bib:emprunterLivre porte l'espace de noms.
-
-
-
-5\. Dans l'onglet Raw : HTTP = la ligne POST, les en-têtes et le code de réponse 200.
-
-&#x20;  XML = le format du texte. SOAP = l'enveloppe Envelope / Header / Body.
-
-&#x20;  HTTP transporte le message, XML est le format de données, SOAP définit la structure
-
-&#x20;  de l'enveloppe et des Faults. Le WSDL est le contrat (adresse, binding, opérations, types).
-
-
+   Résultats observés :
+   - Erreurs 1 et 2 : XML mal formé, curl reçoit « Empty reply from server ».
+   - Erreur 3 : HTTP 500, le service ne reconnaît pas l'opération dans cet espace de noms.
+   - Erreurs 4 et 5 : aucune erreur côté serveur (HTTP 200, pénalité 0). Pour l'erreur 4,
+     le paramètre inconnu est ignoré et rendreLivre ne contrôle pas son argument. Pour
+     l'erreur 5, Metro tolère l'ordre Header/Body, bien que la spécification SOAP
+     impose le Header avant le Body.
