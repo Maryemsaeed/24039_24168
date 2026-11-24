@@ -77,3 +77,44 @@ Matricules : 24039 et 24168
      le paramètre inconnu est ignoré et rendreLivre ne contrôle pas son argument. Pour
      l'erreur 5, Metro tolère l'ordre Header/Body, bien que la spécification SOAP
      impose le Header avant le Body.
+
+## Étape 4
+
+1. Cas 1 (ISBN `978-2-10`) : HTTP 500, faultcode `S:Client`, faultstring
+   « ISBN mal formé : 978-2-10 ». Cas 2 (ISBN `978-2-10-074444-4`, livre déjà emprunté) :
+   HTTP 500, faultcode `S:Server`, faultstring « Livre indisponible ».
+
+2. Dans le cas 2, `<detail>` contient l'élément `LivreIndisponible` avec `<isbn>` et
+   `<retourPrevu>` (2026-12-02). Sa structure est décrite dans le WSDL : l'opération
+   `emprunterLivre` déclare une `fault` (message `LivreIndisponibleException`) dont la
+   partie pointe vers l'élément `tns:LivreIndisponible`, défini dans le schéma XSD
+   (`?xsd=1`) par le type `livreIndisponibleInfo`.
+
+3. JAX-WS a choisi `Server` pour le livre indisponible. Ce n'est pas vraiment une panne
+   du serveur : la demande du client ne peut pas aboutir parce que le livre est déjà
+   sorti. J'aurais plutôt choisi `Client`, la demande ne pouvant pas être satisfaite
+   telle quelle. (Un argument pour `Server` : l'état du serveur, et non le format du
+   message, est la cause du refus.)
+
+4. Avec `mustUnderstand="1"` sur le bloc `jeton`, le serveur refuse le message : HTTP 500,
+   faultcode `S:MustUnderstand`, car il ne comprend pas l'en-tête
+   `{http://supnum.mr/bib}jeton` et l'opération n'est pas exécutée. Avec
+   `mustUnderstand="0"`, le bloc est facultatif : le serveur l'ignore et répond
+   normalement (HTTP 200, numéro d'emprunt).
+
+5. La Fault 1.2 (`xml/03-fault-sender-12.xml`) diffère de la Fault 1.1 par :
+   l'espace de noms de l'enveloppe (`http://www.w3.org/2003/05/soap-envelope`),
+   `faultcode` remplacé par `Code/Value` avec `Sender` (au lieu de `Client`),
+   `faultstring` remplacé par `Reason/Text` avec l'attribut obligatoire `xml:lang`, et
+   `detail` remplacé par `Detail`, dans l'espace de noms SOAP.
+
+Test supplémentaire : dans `rendreLivre`, un numéro ne commençant pas par `E-2026-`
+(par exemple `X-999`) renvoie HTTP 500, faultcode `S:Client`, faultstring
+« Numéro d'emprunt inconnu : X-999 ».
+
+Note : `xmllint` n'étant pas disponible sous Windows, la validité de
+`03-fault-sender-12.xml` a été vérifiée avec le parseur XML de PowerShell.
+
+Note technique : les Faults n'étaient pas produites avec `mvn exec:java` (corps vide, erreurs
+SAAJ et JAXB introuvables). Les dépendances `jaxb-runtime` et `saaj-impl` ont été ajoutées
+au pom.xml, et le serveur a été lancé directement avec `java -cp`.
